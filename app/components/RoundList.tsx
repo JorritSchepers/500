@@ -63,6 +63,10 @@ export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
     }
   }
 
+  function jokerString(jokers: number) {
+    return `${jokers} joker${jokers > 1 ? 's' : ''} `;
+  }
+
   if (rounds.length === 0 && !open) {
     return (
       <>
@@ -77,6 +81,27 @@ export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
 
   return (
     <>
+      {/* Totals footer */}
+      <div className='px-4 py-4'>
+        <div className="grid grid-cols-[3rem_1fr_auto_1fr] items-center">
+          <div />
+          <div className='text-emerald-400'>
+            <p className="text-[16px] uppercase tracking-widest mb-1">Jorrit</p>
+            <p className="text-xl font-semibold tabular-nums ">
+              {jorritTotal.toLocaleString('nl-NL')}
+            </p>
+          </div>
+          <div className="px-3 text-center">
+            <span className={`text-[16px] font-semibold tracking-widest ${jorritTotal > bodileTotal ? 'text-emerald-400' : 'text-fuchsia-400'}`}>{Math.abs(jorritTotal + - bodileTotal)}</span>
+          </div>
+          <div className="text-right text-fuchsia-400">
+            <p className="text-[16px] uppercase tracking-widest mb-1">Bodile</p>
+            <p className="text-xl font-semibold tabular-nums ">
+              {bodileTotal.toLocaleString('nl-NL')}
+            </p>
+          </div>
+        </div>
+      </div >
       <div>
         <div className="divide-y divide-zinc-900">
           {rounds.map((row) => {
@@ -84,13 +109,21 @@ export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
             const bLeads = row.b_score > row.j_score
 
             return (
-              <div key={row.round_id} className="grid grid-cols-[3rem_1fr_auto_1fr] items-center px-4 py-3">
+              <div
+                key={row.round_id}
+                className={`grid grid-cols-[3rem_1fr_auto_1fr] items-center px-4 py-3 transition-colors ${jLeads
+                  ? 'bg-linear-to-r from-emerald-500/20 via-transparent to-transparent'
+                  : bLeads
+                    ? 'bg-linear-to-l from-fuchsia-500/20 via-transparent to-transparent'
+                    : ''
+                  }`}
+              >
                 <span className="text-xs text-zinc-600 tabular-nums">{row.round_id}</span>
 
                 <div className="flex flex-col gap-0.5">
                   <span className={`text-base font-semibold tabular-nums ${row.j_score < 0 ? 'text-red-400' : jLeads ? 'text-emerald-400' : 'text-zinc-300'}`}>
                     {row.j_score > 0 ? `+${row.j_score}` : row.j_score}
-                    {row.j_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">×{row.j_jokers}</span>}
+                    {row.j_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">{jokerString(row.j_jokers)}</span>}
                   </span>
                   <span className="text-xs text-zinc-600 tabular-nums">{row.j_total.toLocaleString('nl-NL')}</span>
                 </div>
@@ -103,36 +136,14 @@ export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
 
                 <div className="flex flex-col gap-0.5 items-end">
                   <span className={`text-base font-semibold tabular-nums ${row.b_score < 0 ? 'text-red-400' : bLeads ? 'text-fuchsia-400' : 'text-zinc-300'}`}>
+                    {row.b_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">{jokerString(row.b_jokers)}</span>}
                     {row.b_score > 0 ? `+${row.b_score}` : row.b_score}
-                    {row.b_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">×{row.b_jokers}</span>}
                   </span>
                   <span className="text-xs text-zinc-600 tabular-nums text-right">{row.b_total.toLocaleString('nl-NL')}</span>
                 </div>
               </div>
             )
           })}
-        </div>
-
-        {/* Totals footer */}
-        <div className="sticky bottom-0 bg-zinc-950 border-t border-zinc-800 px-4 py-4">
-          <div className="grid grid-cols-[3rem_1fr_auto_1fr] items-center">
-            <div />
-            <div>
-              <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Jorrit</p>
-              <p className="text-xl font-semibold tabular-nums text-emerald-400">
-                {jorritTotal.toLocaleString('nl-NL')}
-              </p>
-            </div>
-            <div className="px-3 text-center">
-              <span className="text-[10px] text-zinc-700 uppercase tracking-widest">totaal</span>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Bodile</p>
-              <p className="text-xl font-semibold tabular-nums text-fuchsia-400">
-                {bodileTotal.toLocaleString('nl-NL')}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
