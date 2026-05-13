@@ -4,18 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-type RoundScore = {
-  id: number
+type RoundRow = {
   round_id: number
-  player_id: number
-  score: number
-  jokers: number
-}
-
-type RoundPair = {
-  round_id: number
-  jorrit: RoundScore | null
-  bodile: RoundScore | null
+  j_score: number
+  j_jokers: number
+  j_total: number
+  b_score: number
+  b_jokers: number
+  b_total: number
 }
 
 type FormState = {
@@ -25,7 +21,7 @@ type FormState = {
   bodileJokers: string
 }
 
-export default function RoundList({ rounds }: { rounds: RoundScore[] }) {
+export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -36,21 +32,11 @@ export default function RoundList({ rounds }: { rounds: RoundScore[] }) {
     bodileJokers: '0',
   })
 
-  const roundMap = new Map<number, RoundPair>()
-  for (const r of rounds) {
-    if (!roundMap.has(r.round_id)) {
-      roundMap.set(r.round_id, { round_id: r.round_id, jorrit: null, bodile: null })
-    }
-    const pair = roundMap.get(r.round_id)!
-    if (r.player_id === 1) pair.jorrit = r
-    else pair.bodile = r
-  }
+  const nextRound = (rounds[rounds.length - 1]?.round_id ?? 0) + 1
 
-  const pairs = Array.from(roundMap.values()).sort((a, b) => a.round_id - b.round_id)
-  const nextRound = (pairs[pairs.length - 1]?.round_id ?? 0) + 1
-
-  let jorritTotal = 0
-  let bodileTotal = 0
+  const first = rounds[0]
+  const jorritTotal = first?.j_total ?? 0
+  const bodileTotal = first?.b_total ?? 0
 
   async function handleSave() {
     const jScore = parseInt(form.jorritScore)
@@ -62,12 +48,10 @@ export default function RoundList({ rounds }: { rounds: RoundScore[] }) {
 
     setSaving(true)
     try {
-      var newRoundN = rounds.length + 1
-
       await supabase.from('round_score').insert([
-        { round_id: newRoundN, player_id: 1, score: jScore, jokers: jJokers },
-        { round_id: newRoundN, player_id: 2, score: bScore, jokers: bJokers },
-      ]);
+        { round_id: nextRound, player_id: 1, score: jScore, jokers: jJokers },
+        { round_id: nextRound, player_id: 2, score: bScore, jokers: bJokers },
+      ])
 
       setOpen(false)
       setForm({ jorritScore: '', jorritJokers: '0', bodileScore: '', bodileJokers: '0' })
@@ -95,45 +79,34 @@ export default function RoundList({ rounds }: { rounds: RoundScore[] }) {
     <>
       <div>
         <div className="divide-y divide-zinc-900">
-          {pairs.map((pair) => {
-            const jScore = pair.jorrit?.score ?? 0
-            const bScore = pair.bodile?.score ?? 0
-            const jJokers = pair.jorrit?.jokers ?? 0
-            const bJokers = pair.bodile?.jokers ?? 0
-
-            jorritTotal += jScore
-            bodileTotal += bScore
-
-            const jLeads = jScore > bScore
-            const bLeads = bScore > jScore
+          {rounds.map((row) => {
+            const jLeads = row.j_score > row.b_score
+            const bLeads = row.b_score > row.j_score
 
             return (
-              <div key={pair.round_id} className="grid grid-cols-[3rem_1fr_auto_1fr] items-center px-4 py-3">
-                <span className="text-xs text-zinc-600 tabular-nums">{pair.round_id}</span>
+              <div key={row.round_id} className="grid grid-cols-[3rem_1fr_auto_1fr] items-center px-4 py-3">
+                <span className="text-xs text-zinc-600 tabular-nums">{row.round_id}</span>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className={`text-base font-semibold tabular-nums ${jScore < 0 ? 'text-red-400' : jLeads ? 'text-emerald-400' : 'text-zinc-300'
-                    }`}>
-                    {jScore > 0 ? `+${jScore}` : jScore}
-                    {jJokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">×{jJokers}</span>}
+                  <span className={`text-base font-semibold tabular-nums ${row.j_score < 0 ? 'text-red-400' : jLeads ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                    {row.j_score > 0 ? `+${row.j_score}` : row.j_score}
+                    {row.j_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">×{row.j_jokers}</span>}
                   </span>
-                  <span className="text-xs text-zinc-600 tabular-nums">{jorritTotal.toLocaleString('nl-NL')}</span>
+                  <span className="text-xs text-zinc-600 tabular-nums">{row.j_total.toLocaleString('nl-NL')}</span>
                 </div>
 
                 <div className="px-3 text-center">
-                  <span className={`text-[11px] tabular-nums font-medium ${jScore > bScore ? 'text-emerald-500' : bScore > jScore ? 'text-fuchsia-500' : 'text-zinc-700'
-                    }`}>
-                    {jScore === bScore ? '—' : jLeads ? `+${jScore - bScore}` : `+${bScore - jScore}`}
+                  <span className={`text-[11px] tabular-nums font-medium ${jLeads ? 'text-emerald-500' : bLeads ? 'text-fuchsia-500' : 'text-zinc-700'}`}>
+                    {row.j_score === row.b_score ? '—' : jLeads ? `+${row.j_score - row.b_score}` : `+${row.b_score - row.j_score}`}
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-0.5 items-end">
-                  <span className={`text-base font-semibold tabular-nums ${bScore < 0 ? 'text-red-400' : bLeads ? 'text-fuchsia-400' : 'text-zinc-300'
-                    }`}>
-                    {bScore > 0 ? `+${bScore}` : bScore}
-                    {bJokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">×{bJokers}</span>}
+                  <span className={`text-base font-semibold tabular-nums ${row.b_score < 0 ? 'text-red-400' : bLeads ? 'text-fuchsia-400' : 'text-zinc-300'}`}>
+                    {row.b_score > 0 ? `+${row.b_score}` : row.b_score}
+                    {row.b_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">×{row.b_jokers}</span>}
                   </span>
-                  <span className="text-xs text-zinc-600 tabular-nums text-right">{bodileTotal.toLocaleString('nl-NL')}</span>
+                  <span className="text-xs text-zinc-600 tabular-nums text-right">{row.b_total.toLocaleString('nl-NL')}</span>
                 </div>
               </div>
             )
@@ -146,7 +119,7 @@ export default function RoundList({ rounds }: { rounds: RoundScore[] }) {
             <div />
             <div>
               <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Jorrit</p>
-              <p className='text-xl font-semibold tabular-nums text-emerald-400'>
+              <p className="text-xl font-semibold tabular-nums text-emerald-400">
                 {jorritTotal.toLocaleString('nl-NL')}
               </p>
             </div>
@@ -155,7 +128,7 @@ export default function RoundList({ rounds }: { rounds: RoundScore[] }) {
             </div>
             <div className="text-right">
               <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Bodile</p>
-              <p className='text-xl font-semibold tabular-nums text-fuchsia-400'>
+              <p className="text-xl font-semibold tabular-nums text-fuchsia-400">
                 {bodileTotal.toLocaleString('nl-NL')}
               </p>
             </div>

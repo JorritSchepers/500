@@ -3,9 +3,10 @@ import RoundList from './components/RoundList'
 
 export default async function Home() {
   const { data: rounds, error } = await supabase
-    .from('round_score')
+    .from('score_view')
     .select('*')
-    .order('round_id')
+    .order('round_id', { ascending: false })
+    .limit(50)
 
   if (error) {
     return (
