@@ -3,28 +3,17 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-
-type RoundRow = {
-  round_id: number
-  j_score: number
-  j_jokers: number
-  j_total: number
-  b_score: number
-  b_jokers: number
-  b_total: number
-}
-
-type FormState = {
-  jorritScore: string
-  jorritJokers: string
-  bodileScore: string
-  bodileJokers: string
-}
+import { SwipeableRow } from './SwipeableRow'
+import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { FloatingButton } from './FloatingButton'
+import { FormState, NewRoundModal } from './NewRoundModal'
 
 export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [openNewRoundModal, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [roundIdToDelete, setConfirmDeleteId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState<FormState>({
     jorritScore: '',
     jorritJokers: '0',
@@ -32,7 +21,7 @@ export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
     bodileJokers: '0',
   })
 
-  const nextRound = (rounds[rounds.length - 1]?.round_id ?? 0) + 1
+  const nextRound = (rounds[0]?.round_id ?? 0) + 1
 
   const first = rounds[0]
   const jorritTotal = first?.j_total ?? 0
@@ -63,212 +52,101 @@ export default function RoundList({ rounds }: { rounds: RoundRow[] }) {
     }
   }
 
-  function jokerString(jokers: number) {
-    return `${jokers} joker${jokers > 1 ? 's' : ''} `;
+  async function handleConfirmDelete() {
+    if (roundIdToDelete === null) return
+    setDeleting(true)
+    try {
+      await supabase.from('round').delete().eq('id', roundIdToDelete)
+      setConfirmDeleteId(null)
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setDeleting(false)
+    }
   }
 
-  if (rounds.length === 0 && !open) {
+  function jokerString(jokers: number) {
+    return `${jokers} joker${jokers > 1 ? 's' : ''} `
+  }
+
+  function getOpenNewRoundModal() {
+    return (
+      <NewRoundModal
+        form={form}
+        setForm={setForm}
+        onClose={() => setOpen(false)}
+        onSave={handleSave}
+        saving={saving}
+        nextRound={nextRound}
+      />
+    )
+  }
+
+  if (rounds.length === 0 && !openNewRoundModal) {
     return (
       <>
         <div className="flex items-center justify-center py-20 text-zinc-600 text-sm">
           Geen rondes gevonden
         </div>
         <FloatingButton onClick={() => setOpen(true)} />
-        {open && <Modal form={form} setForm={setForm} onClose={() => setOpen(false)} onSave={handleSave} saving={saving} nextRound={nextRound} />}
+        {openNewRoundModal && getOpenNewRoundModal()}
       </>
     )
   }
 
   return (
     <>
-      {/* Totals footer */}
-      <div className='px-4 py-4'>
+      {/* Totals */}
+      <div className="px-4 py-4">
         <div className="grid grid-cols-[3rem_1fr_auto_1fr] items-center">
           <div />
-          <div className='text-emerald-400'>
+          <div className="text-emerald-400">
             <p className="text-[16px] uppercase tracking-widest mb-1">Jorrit</p>
-            <p className="text-xl font-semibold tabular-nums ">
+            <p className="text-xl font-semibold tabular-nums">
               {jorritTotal.toLocaleString('nl-NL')}
             </p>
           </div>
           <div className="px-3 text-center">
-            <span className={`text-[16px] font-semibold tracking-widest ${jorritTotal > bodileTotal ? 'text-emerald-400' : 'text-fuchsia-400'}`}>{Math.abs(jorritTotal + - bodileTotal)}</span>
+            <span
+              className={`text-[16px] font-semibold tracking-widest ${jorritTotal > bodileTotal ? 'text-emerald-400' : 'text-fuchsia-400'
+                }`}
+            >
+              {Math.abs(jorritTotal - bodileTotal)}
+            </span>
           </div>
           <div className="text-right text-fuchsia-400">
             <p className="text-[16px] uppercase tracking-widest mb-1">Bodile</p>
-            <p className="text-xl font-semibold tabular-nums ">
+            <p className="text-xl font-semibold tabular-nums">
               {bodileTotal.toLocaleString('nl-NL')}
             </p>
           </div>
         </div>
-      </div >
-      <div>
-        <div className="divide-y divide-zinc-900">
-          {rounds.map((row) => {
-            const jLeads = row.j_score > row.b_score
-            const bLeads = row.b_score > row.j_score
+      </div>
 
-            return (
-              <div
-                key={row.round_id}
-                className={`grid grid-cols-[3rem_1fr_auto_1fr] items-center px-4 py-3 transition-colors ${jLeads
-                  ? 'bg-linear-to-r from-emerald-500/20 via-transparent to-transparent'
-                  : bLeads
-                    ? 'bg-linear-to-l from-fuchsia-500/20 via-transparent to-transparent'
-                    : ''
-                  }`}
-              >
-                <span className="text-xs text-zinc-600 tabular-nums">{row.round_id}</span>
-
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-base font-semibold tabular-nums ${row.j_score < 0 ? 'text-red-400' : jLeads ? 'text-emerald-400' : 'text-zinc-300'}`}>
-                    {row.j_score > 0 ? `+${row.j_score}` : row.j_score}
-                    {row.j_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">{jokerString(row.j_jokers)}</span>}
-                  </span>
-                  <span className="text-xs text-zinc-600 tabular-nums">{row.j_total.toLocaleString('nl-NL')}</span>
-                </div>
-
-                <div className="px-3 text-center">
-                  <span className={`text-[11px] tabular-nums font-medium ${jLeads ? 'text-emerald-500' : bLeads ? 'text-fuchsia-500' : 'text-zinc-700'}`}>
-                    {row.j_score === row.b_score ? '—' : jLeads ? `+${row.j_score - row.b_score}` : `+${row.b_score - row.j_score}`}
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-0.5 items-end">
-                  <span className={`text-base font-semibold tabular-nums ${row.b_score < 0 ? 'text-red-400' : bLeads ? 'text-fuchsia-400' : 'text-zinc-300'}`}>
-                    {row.b_jokers > 0 && <span className="ml-1.5 text-[10px] font-normal text-amber-500 tracking-wide">{jokerString(row.b_jokers)}</span>}
-                    {row.b_score > 0 ? `+${row.b_score}` : row.b_score}
-                  </span>
-                  <span className="text-xs text-zinc-600 tabular-nums text-right">{row.b_total.toLocaleString('nl-NL')}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+      <div className="divide-y divide-zinc-900">
+        {rounds.map((row) => (
+          <SwipeableRow
+            key={row.round_id}
+            row={row}
+            jokerString={jokerString}
+            onDeleteRequest={() => setConfirmDeleteId(row.round_id)}
+          />
+        ))}
       </div>
 
       <FloatingButton onClick={() => setOpen(true)} />
-      {open && <Modal form={form} setForm={setForm} onClose={() => setOpen(false)} onSave={handleSave} saving={saving} nextRound={nextRound} />}
-    </>
-  )
-}
 
-function FloatingButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="fixed bottom-6 right-6 z-20 w-14 h-14 rounded-full bg-white text-zinc-950 flex items-center justify-center text-2xl font-light hover:scale-105 active:scale-95 transition-transform shadow-none"
-      aria-label="Ronde toevoegen"
-    >
-      +
-    </button>
-  )
-}
+      {openNewRoundModal && getOpenNewRoundModal()}
 
-function Modal({
-  form, setForm, onClose, onSave, saving, nextRound
-}: {
-  form: FormState
-  setForm: (f: FormState) => void
-  onClose: () => void
-  onSave: () => void
-  saving: boolean
-  nextRound: number
-}) {
-  function field(key: keyof FormState, value: string) {
-    setForm({ ...form, [key]: value })
-  }
-
-  const canSave = form.jorritScore !== '' && form.bodileScore !== ''
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-30 bg-black/70"
-        onClick={onClose}
-      />
-
-      {/* Sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-900 rounded-t-2xl px-5 pt-5 pb-8 border-t border-zinc-800">
-
-        {/* Handle */}
-        <div className="w-10 h-1 rounded-full bg-zinc-700 mx-auto mb-5" />
-
-        {/* Title */}
-        <div className="flex items-baseline justify-between mb-6">
-          <h2 className="text-base font-semibold text-white">Ronde {nextRound}</h2>
-          <button onClick={onClose} className="text-zinc-500 text-sm hover:text-zinc-300">annuleer</button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {/* Jorrit */}
-          <div>
-            <p className="text-xs text-emerald-400 font-medium uppercase tracking-widest mb-3">Jorrit</p>
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="text-[11px] text-zinc-500 block mb-1">Punten</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={form.jorritScore}
-                  onChange={e => field('jorritScore', e.target.value)}
-                  placeholder="0"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-zinc-500 block mb-1">Jokers</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  value={form.jorritJokers}
-                  onChange={e => field('jorritJokers', e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Bodile */}
-          <div>
-            <p className="text-xs text-fuchsia-400 font-medium uppercase tracking-widest mb-3">Bodile</p>
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="text-[11px] text-zinc-500 block mb-1">Punten</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={form.bodileScore}
-                  onChange={e => field('bodileScore', e.target.value)}
-                  placeholder="0"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-zinc-500 block mb-1">Jokers</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  value={form.bodileJokers}
-                  onChange={e => field('bodileJokers', e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={onSave}
-          disabled={!canSave || saving}
-          className="w-full bg-white text-zinc-950 rounded-xl py-3.5 text-sm font-semibold disabled:opacity-30 hover:bg-zinc-100 active:scale-[0.98] transition-all"
-        >
-          {saving ? 'Opslaan…' : 'Opslaan'}
-        </button>
-      </div>
+      {roundIdToDelete !== null && (
+        <ConfirmDeleteModal
+          roundId={roundIdToDelete}
+          deleting={deleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     </>
   )
 }
