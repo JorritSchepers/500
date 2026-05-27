@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import RoundList from './components/RoundList'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   const { data: rounds, error } = await supabase
     .from('score_view')
